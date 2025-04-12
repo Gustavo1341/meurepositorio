@@ -1,0 +1,25 @@
+[
+    {
+      "filename": "depoimento_cliente_feliz.mp4",
+      "type": "video",
+      "description": "Cliente Satisfeito relata aumento de 25% nas vendas após usar o Agente IA.",
+      "tags": ["resultado", "vendas", "depoimento"]
+    },
+    {
+      "filename": "conversa_whatsapp_ia.png",
+      "type": "image",
+      "description": "Print screen mostrando a naturalidade da IA respondendo a uma pergunta complexa sobre o produto.",
+      "tags": ["naturalidade", "conversa", "exemplo"]
+    },
+    {
+      "filename": "audio_explicacao_onboarding.mp3",
+      "type": "audio",
+      "description": "Áudio curto do CEO explicando como o onboarding VIP funciona para clientes anuais.",
+      "tags": ["onboarding", "vip", "explicação"]
+    },
+    {
+      "filename": "print_resultados_incriveis.png",
+      "type": "image",
+      "description": "Print screen mostrando que o lucro aumentou em 20% da IA respondendo a uma pergunta complexa sobre o produto."
+    }
+  ]

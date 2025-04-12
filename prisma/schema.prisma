@@ -1,0 +1,140 @@
+// prisma/schema.prisma
+
+// Define o gerador de cliente Prisma (APENAS UM BLOCO)
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"] // Gera apenas o motor nativo para o ambiente de build
+}
+
+// Define a fonte de dados (APENAS UM BLOCO)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS ---
+
+// Define os possíveis papéis em uma mensagem do histórico
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// Define os tipos de entradas de memória que podem ser armazenadas
+enum MemoryType {
+  SUMMARY   // Resumo da conversa
+  ENTITIES  // Entidades extraídas (ex: email, telefone, interesse)
+  SEMANTIC  // Informações recuperadas por busca semântica (requer embeddings)
+  NOTE      // Notas manuais ou do sistema sobre a conversa
+}
+
+
+// --- MODELOS PRINCIPAIS ---
+
+// Modelo para representar um cliente/conta do SaaS (Tenant)
+model Tenant {
+  id        String    @id @default(cuid()) // ID único do Tenant (ou uuid())
+  name      String    // Nome do cliente/empresa
+  isActive  Boolean   @default(true) // Status da conta
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relacionamentos
+  botConfig    BotConfiguration?     // Configuração do Bot (1-para-1 opcional)
+  funnelConfig FunnelConfiguration?  // Configuração do Funil (1-para-1 opcional)
+  conversations Conversation[]      // Lista de conversas deste tenant
+
+  @@map("tenants") // Mapeia para a tabela "tenants"
+}
+
+// Modelo para armazenar configurações específicas do bot para um Tenant
+model BotConfiguration {
+  id                  String    @id @default(cuid())
+  tenantId            String    @unique // Chave estrangeira para Tenant (relação 1-para-1)
+  botFirstName        String?   // Permite override do nome padrão
+  botCompany          String?   // Permite override da empresa padrão
+  botPosition         String?   // Permite override da posição padrão
+  botTone             String?   @db.Text // Override do tom/personalidade (texto longo)
+  openAiApiKey        String?   // Chave OpenAI específica do tenant (CONSIDERAR CRIPTOGRAFIA)
+  supportWhatsappNumber String? // Número de suporte específico do tenant
+  // Adicionar outros campos de botConfig que podem ser sobrescritos
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relacionamento reverso
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade) // Se tenant for deletado, deleta config
+
+  @@map("bot_configurations")
+}
+
+// Modelo para armazenar as configurações do funil "blueprint" de um Tenant
+model FunnelConfiguration {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique // Chave estrangeira para Tenant (relação 1-para-1)
+  blueprintData Json?    // Armazena as instruções simplificadas do cliente como JSON.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacionamento reverso
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("funnel_configurations")
+}
+
+// Modelo para representar uma conversa específica com um contato do WhatsApp
+model Conversation {
+  id                     String     @id @default(cuid())
+  tenantId               String     // Chave estrangeira para o Tenant dono desta conversa
+  chatId                 String     // ID do WhatsApp do contato (ex: 55119...c.us) - Deve ser único por tenant
+
+  contactName            String?    // Nome do contato (pode ser atualizado)
+  currentFunnelStepId    String?    // ID da etapa atual do funil
+  isBlockedUntil         DateTime?  // Timestamp até quando o usuário está bloqueado
+  humanTakeoverUntil     DateTime?  // Timestamp até quando o bot está pausado por humano
+  lastInteractionTimestamp DateTime @default(now()) // Timestamp da última interação registrada
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  // Relacionamentos
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade) // Se tenant for deletado, deleta conversas
+  messages  Message[]     // Histórico de mensagens desta conversa
+  memory    MemoryEntry[] // Entradas de memória associadas a esta conversa
+
+  @@unique([tenantId, chatId]) // Garante que um chatId seja único para cada tenant
+  @@index([tenantId])          // Índice para buscar conversas por tenant
+  @@index([chatId])            // Índice para buscar conversas por chatId
+  @@map("conversations")
+}
+
+// Modelo para armazenar cada mensagem individual de uma conversa
+model Message {
+  id        String      @id @default(cuid())
+  convId    String      // Chave estrangeira para a Conversation
+  role      MessageRole // Quem enviou: USER, ASSISTANT, SYSTEM
+  content   String      @db.Text // Conteúdo da mensagem (texto longo)
+  timestamp DateTime    // Timestamp exato da mensagem (do WhatsApp ou do registro)
+  createdAt DateTime    @default(now()) // Quando a mensagem foi salva no DB
+
+  // Relacionamento
+  conversation Conversation @relation(fields: [convId], references: [id], onDelete: Cascade) // Se conversa for deletada, deleta mensagens
+
+  @@index([convId, timestamp]) // Índice para ordenar mensagens por timestamp dentro de uma conversa
+  @@map("messages")
+}
+
+// Modelo para armazenar diferentes tipos de memória associados a uma conversa
+model MemoryEntry {
+  id          String     @id @default(cuid())
+  convId      String     // Chave estrangeira para a Conversation
+  type        MemoryType // Tipo da entrada de memória (SUMARIO, ENTIDADE, etc.)
+  content     Json       // Conteúdo da memória (pode ser JSON para entidades ou string para sumário)
+  lastUpdated DateTime   @updatedAt // Quando esta entrada foi atualizada
+
+  // Relacionamento
+  conversation Conversation @relation(fields: [convId], references: [id], onDelete: Cascade) // Se conversa for deletada, deleta memória
+
+  // Garante que a combinação de conversa e tipo de memória seja única
+  @@unique([convId, type])
+  @@map("memory_entries")
+}

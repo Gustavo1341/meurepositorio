@@ -1,0 +1,36 @@
+# .dockerignore
+
+# Ignora dependências e arquivos de build locais
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+dist
+
+# Ignora arquivos de configuração sensíveis e de ambiente local
+.env*
+*.env
+!.env.example # Não ignora o arquivo de exemplo
+
+# Ignora pastas de dados gerados/persistidos localmente (serão volumes)
+logs
+session
+temp
+# provasSociais # Não ignora, pode ser parte do build inicial se necessário
+# training      # Não ignora, pode ser parte do build inicial se necessário
+
+# Ignora arquivos de controle de versão e IDE
+.git
+.gitignore
+.gitattributes
+*.md # Geralmente não necessário na imagem
+.vscode
+.idea
+
+# Arquivos do Docker (não precisam estar na imagem)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Outros
+*.log
